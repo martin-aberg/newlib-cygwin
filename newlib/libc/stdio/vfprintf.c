@@ -689,8 +689,7 @@ _VFPRINTF_R (struct _reent *data,
 	char *decimal_point = _localeconv_r (data)->decimal_point;
 	size_t decp_len = strlen (decimal_point);
 	char softsign;		/* temporary negative sign for floats */
-	union { int i; _PRINTF_FLOAT_TYPE fp; } _double_ = {0};
-# define _fpvalue (_double_.fp)
+	int fpvalue_is_zero = 1;
 	int expt;		/* integer value of exponent */
 	int expsize = 0;	/* character count for expstr */
 	char expstr[MAXEXPLEN];	/* buffer for exponent string */
@@ -1212,7 +1211,8 @@ reswitch:	switch (ch) {
 		case 'E':
 		case 'f':
 		case 'g':
-		case 'G':
+		case 'G': {
+			_PRINTF_FLOAT_TYPE _fpvalue;
 # ifdef _NO_LONGDBL
 			if (flags & LONGDBL) {
 				_fpvalue = (double) GET_ARG (N, ap, _LONG_DOUBLE);
@@ -1310,6 +1310,7 @@ reswitch:	switch (ch) {
 			}
 
 			flags |= FPT;
+			fpvalue_is_zero = (_fpvalue == 0);
 
 			cp = cvt (data, _fpvalue, prec, flags, &softsign,
 				  &expt, ch, &ndig, cp);
@@ -1376,6 +1377,7 @@ reswitch:	switch (ch) {
 			if (softsign)
 				sign = '-';
 			break;
+		}
 #endif /* FLOATING_POINT */
 #ifdef _GLIBC_EXTENSION
 		case 'm':  /* extension */
@@ -1703,7 +1705,7 @@ number:			if ((dprec = prec) >= 0)
 			PRINT (cp, size);
 		} else {	/* glue together f_p fragments */
 			if (ch >= 'f') {	/* 'f' or 'g' */
-				if (_fpvalue == 0) {
+				if (fpvalue_is_zero) {
 					/* kludge for __dtoa irregularity */
 					PRINT ("0", 1);
 					if (expt < ndig || flags & ALT) {
@@ -1750,7 +1752,7 @@ number:			if ((dprec = prec) >= 0)
 					PRINT (cp, 1);
 					cp++;
 					PRINT (decimal_point, decp_len);
-					if (_fpvalue) {
+					if (!fpvalue_is_zero) {
 						PRINT (cp, ndig - 1);
 					} else	/* 0.[0..] */
 						/* __dtoa irregularity */
